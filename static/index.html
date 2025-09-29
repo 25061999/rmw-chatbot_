@@ -1,0 +1,146 @@
+<!-- static/index.html -->
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>RMW Chatbot</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    body {
+      font-family: Inter, Arial, sans-serif;
+      background:#f7fafc;
+      margin:0;
+      padding:0;
+      display:flex;
+      height:100vh;
+      align-items:center;
+      justify-content:center;
+    }
+    .container {
+      width:720px;
+      max-width:95%;
+      background:white;
+      border-radius:12px;
+      box-shadow:0 6px 30px rgba(0,0,0,0.08);
+      overflow:hidden;
+    }
+    header {
+      padding:18px 20px;
+      border-bottom:1px solid #eee;
+      background:linear-gradient(90deg,#0ea5a4,#7c3aed);
+      color:white;
+    }
+    header h1 { margin:0; font-size:18px; }
+    #chat { height:60vh; overflow:auto; padding:20px; background:#fbfdff; }
+    .msg { margin-bottom:16px; }
+    .user { text-align:right; }
+    .bubble { display:inline-block; padding:10px 14px; border-radius:14px; max-width:78%; }
+    .bubble.user { background:#e6fffa; border:1px solid #c6f6f4; }
+    .bubble.bot { background:#eef2ff; border:1px solid #dbeafe; text-align:left; white-space: pre-wrap; }
+    footer { padding:12px; display:flex; gap:8px; border-top:1px solid #eee; }
+    input[type="text"] { flex:1; padding:10px 12px; border-radius:8px; border:1px solid #ddd; }
+    button { padding:10px 14px; border-radius:8px; border:none; background:#0ea5a4; color:white; cursor:pointer; }
+    small.source { display:block; margin-top:6px; color:#555; font-size:12px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Ritz Media World — Chatbot</h1>
+    </header>
+    <div id="chat"></div>
+    <footer>
+      <input id="input" type="text" placeholder="Ask about Ritz Media World (address, services, hours, phone)..." />
+      <button id="send">Send</button>
+    </footer>
+  </div>
+
+<script>
+const chat = document.getElementById('chat');
+const input = document.getElementById('input');
+const send = document.getElementById('send');
+
+function scrollBottom() {
+  chat.scrollTop = chat.scrollHeight;
+}
+
+function addMessage(content, who='bot', source=null){
+  const div = document.createElement('div');
+  div.className = 'msg ' + (who === 'user' ? 'user' : 'bot');
+
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble ' + (who === 'user' ? 'user' : 'bot');
+
+  // Handle string (field-specific) vs object (summary)
+  if(typeof content === 'string'){
+    bubble.innerText = content;
+  } else if(typeof content === 'object' && content !== null){
+    // summary field for general queries
+    if(content.summary){
+      bubble.innerText = content.summary;
+    } else {
+      // fallback: show combined structured info
+      let textParts = [];
+      if(content.phones && content.phones.length) textParts.push("Phone: " + content.phones.join(", "));
+      if(content.emails && content.emails.length) textParts.push("Email: " + content.emails.join(", "));
+      if(content.addresses && content.addresses.length) textParts.push("Address:\n" + content.addresses.slice(0,3).join("\n"));
+      if(content.founders_ceo && content.founders_ceo.length) textParts.push("Founders/CEOs: " + content.founders_ceo.join(", "));
+      if(content.websites && content.websites.length) textParts.push("Website: " + content.websites.join(", "));
+      bubble.innerText = textParts.join("\n\n") || 'No answer found.';
+    }
+  } else {
+    bubble.innerText = 'No answer found.';
+  }
+
+  div.appendChild(bubble);
+
+  if(source){
+    const s = document.createElement('small');
+    s.className = 'source';
+    s.innerText = 'Source excerpt: ' + source;
+    div.appendChild(s);
+  }
+
+  chat.appendChild(div);
+  scrollBottom();
+}
+
+async function queryServer(query){
+  if(!query) return;
+  addMessage(query, 'user');
+  input.value = '';
+
+  try{
+    const resp = await fetch('/chat', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({query: query, top_k:3})
+    });
+
+    const data = await resp.json();
+
+    if(data.error){
+      addMessage('Error: ' + data.error, 'bot');
+      return;
+    }
+
+    addMessage(
+      data.answer,
+      'bot',
+      data.sources && data.sources[0] ? (data.sources[0].text.slice(0,200) + '...') : null
+    );
+
+  } catch(err){
+    addMessage('Request failed: ' + err.message, 'bot');
+  }
+}
+
+// Event listeners
+send.addEventListener('click', ()=> queryServer(input.value.trim()));
+input.addEventListener('keydown', (e)=> { if(e.key === 'Enter') send.click(); });
+
+// Welcome message
+addMessage('Hello! Ask me about Ritz Media World: address, phone, services, hours, etc.', 'bot');
+</script>
+</body>
+</html>

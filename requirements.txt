@@ -1,0 +1,6 @@
+Flask==2.2.5
+sentence-transformers==2.2.2
+faiss-cpu==1.7.4
+python-docx==0.8.11
+numpy==1.26.4
+tqdm==4.66.1
